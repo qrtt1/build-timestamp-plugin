@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static com.orctom.jenkins.plugin.buildtimestamp.BuildTimestampPlugin.BUILD_CREATED_PROPERTY;
 import static com.orctom.jenkins.plugin.buildtimestamp.BuildTimestampPlugin.DEFAULT_PROPERTY;
 
 /**
@@ -26,7 +27,7 @@ public class BuildTimestampEnvironmentContributor extends EnvironmentContributor
 			throws IOException, InterruptedException {
 		if (null == envVars.get(DEFAULT_PROPERTY)) {
 			try {
-				Map<String, String> timestampProperties = buildTimestamp(run.getTimestamp());
+				Map<String, String> timestampProperties = buildTimestamp(getFirstRun(run).getTimestamp(), run.getTimestamp());
 				envVars.putAll(timestampProperties);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -34,7 +35,19 @@ public class BuildTimestampEnvironmentContributor extends EnvironmentContributor
 		}
 	}
 
-	private Map<String, String> buildTimestamp(Calendar timestamp) {
+	private Run getFirstRun(Run run) {
+		Run parent = run.getPreviousBuild();
+		while (parent != null) {
+			if (parent.getPreviousBuild() == null) {
+				break;
+			}
+			parent = parent.getPreviousBuild();
+		}
+
+		return parent == null ? run : parent;
+	}
+
+	private Map<String, String> buildTimestamp(Calendar createdTimestamp, Calendar timestamp) {
 		Map<String, String> timestampProperties = new HashMap<String, String>();
 		DescriptorImpl descriptor = getDescriptorImpl();
 		if (descriptor.isEnableBuildTimestamp()) {
@@ -42,6 +55,7 @@ public class BuildTimestampEnvironmentContributor extends EnvironmentContributor
 			String pattern = descriptor.getPattern();
 
 			setTimestamp(timestampProperties, DEFAULT_PROPERTY, format(timestamp, timeZone, pattern, ""));
+			setTimestamp(timestampProperties, BUILD_CREATED_PROPERTY, format(createdTimestamp, timeZone, pattern, ""));
 
 			Set<BuildTimestampExtraProperty> extraProperties = descriptor.getExtraProperties();
 			for (BuildTimestampExtraProperty property : extraProperties) {
